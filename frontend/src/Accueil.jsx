@@ -1,10 +1,13 @@
+
 import { useEffect, useState } from "react";
 
 export default function Accueil({ onCommencer }) {
   const [animation, setAnimation] = useState(false);
 
   useEffect(() => {
-    setTimeout(() => setAnimation(true), 100);
+    setAnimation(true);
+    const timer = setTimeout(onCommencer, 1500);
+    return () => clearTimeout(timer);
   }, []);
 
   return (
@@ -99,3 +102,5 @@ export default function Accueil({ onCommencer }) {
     </div>
   );
 }
+
+

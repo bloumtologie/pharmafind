@@ -45,7 +45,10 @@ export default function Auth({ onConnecte }) {
       display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
       zIndex: 9999, fontFamily: "Segoe UI, sans-serif",
-      padding: "1.5rem", boxSizing: "border-box"
+      maxWidth: "480px", margin: "0 auto",
+      padding: "1.5rem",
+      boxSizing: "border-box",
+      overflow: "hidden"
     }}>
 
       {/* LOGO */}
