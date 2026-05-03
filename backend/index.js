@@ -331,6 +331,47 @@ app.put("/api/pharmacien/reservations/:id", verifierToken, verifierRole("pharmac
   }
 });
 
+// PATIENT — Créer une réservation
+app.post("/api/reservations", verifierToken, verifierRole("patient", "admin"), async (req, res) => {
+  const { pharmacie_id, medicament_nom, quantite, note } = req.body;
+  try {
+    const med = await pool.query(
+      "SELECT id FROM medicaments WHERE LOWER(nom) = LOWER($1)",
+      [medicament_nom]
+    );
+    if (med.rows.length === 0) {
+      return res.status(404).json({ message: "Médicament non trouvé" });
+    }
+    const medicament_id = med.rows[0].id;
+    const result = await pool.query(
+      "INSERT INTO reservations (patient_id, pharmacie_id, medicament_id, quantite, note) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [req.utilisateur.id, pharmacie_id, medicament_id, quantite, note || ""]
+    );
+    res.status(201).json({ message: "Réservation créée", reservation: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
+// PATIENT — Ses réservations
+app.get("/api/reservations", verifierToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT r.*, m.nom as medicament_nom, p.nom as pharmacie_nom,
+        p.telephone as pharmacie_telephone
+      FROM reservations r
+      JOIN medicaments m ON m.id = r.medicament_id
+      JOIN pharmacies p ON p.id = r.pharmacie_id
+      WHERE r.patient_id = $1
+      ORDER BY r.created_at DESC
+    `, [req.utilisateur.id]);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
 // ROUTE TEST
 app.get("/", (req, res) => {
   res.json({ message: "💊 PharmaFind API fonctionne !" });

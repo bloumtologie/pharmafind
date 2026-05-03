@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
+
+const API = "http://localhost:3001";
 
 export default function Reservation({ pharmacie, utilisateur, onFermer }) {
   const [etape, setEtape] = useState("choix");
@@ -6,22 +9,43 @@ export default function Reservation({ pharmacie, utilisateur, onFermer }) {
   const [quantite, setQuantite] = useState(1);
   const [note, setNote] = useState("");
   const [confirmation, setConfirmation] = useState(null);
+  const [chargement, setChargement] = useState(false);
+  const [erreur, setErreur] = useState("");
 
-  const handleReserver = () => {
-    const reservation = {
-      id: Math.floor(Math.random() * 10000),
-      pharmacie: pharmacie.nom,
-      medicament: medicamentChoisi,
-      quantite,
-      note,
-      statut: "en_attente",
-      heure: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
-      date: new Date().toLocaleDateString("fr-FR"),
-      patient: utilisateur?.nom || "Patient",
-    };
-    setConfirmation(reservation);
-    setEtape("confirmation");
+  const handleReserver = async () => {
+    setChargement(true);
+    setErreur("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.post(API + "/api/reservations", {
+        pharmacie_id: pharmacie.id,
+        medicament_nom: medicamentChoisi,
+        quantite,
+        note,
+      }, {
+        headers: { Authorization: "Bearer " + token }
+      });
+
+      setConfirmation({
+        id: res.data.reservation.id,
+        pharmacie: pharmacie.nom,
+        medicament: medicamentChoisi,
+        quantite,
+        note,
+        statut: "en_attente",
+        heure: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+        date: new Date().toLocaleDateString("fr-FR"),
+        patient: utilisateur?.nom || "Patient",
+      });
+      setEtape("confirmation");
+    } catch (err) {
+      setErreur(err.response?.data?.message || "Erreur lors de la réservation");
+    }
+    setChargement(false);
   };
+
+  // Nettoie les caractères spéciaux
+  const nomPropre = (nom) => nom ? nom.replace(/\uFFFD/g, "é").replace(/[^\x20-\x7E\u00C0-\u024F]/g, "?") : nom;
 
   return (
     <div style={{
@@ -65,7 +89,7 @@ export default function Reservation({ pharmacie, utilisateur, onFermer }) {
                     transition: "all 0.2s"
                   }}
                 >
-                  <span style={{ fontWeight: 500, color: "#27500A" }}>💊 {m}</span>
+                  <span style={{ fontWeight: 500, color: "#27500A" }}>💊 {nomPropre(m)}</span>
                   {medicamentChoisi === m && <span style={{ color: "#639922", fontWeight: 700 }}>✓</span>}
                 </div>
               ))}
@@ -82,18 +106,14 @@ export default function Reservation({ pharmacie, utilisateur, onFermer }) {
                     <button
                       onClick={() => setQuantite(Math.max(1, quantite - 1))}
                       style={{ width: "36px", height: "36px", borderRadius: "50%", border: "1px solid #c3e0a8", background: "white", fontSize: "1.2rem", cursor: "pointer", color: "#639922" }}
-                    >
-                      −
-                    </button>
+                    >−</button>
                     <span style={{ fontWeight: 700, fontSize: "1.2rem", color: "#27500A", minWidth: "30px", textAlign: "center" }}>
                       {quantite}
                     </span>
                     <button
                       onClick={() => setQuantite(quantite + 1)}
                       style={{ width: "36px", height: "36px", borderRadius: "50%", border: "1px solid #c3e0a8", background: "#639922", fontSize: "1.2rem", cursor: "pointer", color: "white" }}
-                    >
-                      +
-                    </button>
+                    >+</button>
                   </div>
                 </div>
 
@@ -110,6 +130,12 @@ export default function Reservation({ pharmacie, utilisateur, onFermer }) {
                     style={{ width: "100%", padding: "0.7rem 1rem", borderRadius: "12px", border: "1.5px solid #c3e0a8", outline: "none", fontSize: "0.9rem", boxSizing: "border-box", resize: "none", fontFamily: "Segoe UI, sans-serif" }}
                   />
                 </div>
+
+                {erreur && (
+                  <div style={{ background: "#fff0f0", color: "#c0392b", padding: "0.7rem", borderRadius: "10px", fontSize: "0.85rem", marginBottom: "1rem", textAlign: "center" }}>
+                    ⚠️ {erreur}
+                  </div>
+                )}
 
                 <button
                   onClick={() => setEtape("recap")}
@@ -128,11 +154,10 @@ export default function Reservation({ pharmacie, utilisateur, onFermer }) {
             <div style={{ fontWeight: 600, color: "#27500A", marginBottom: "1rem", fontSize: "0.9rem" }}>
               📋 Récapitulatif
             </div>
-
             <div style={{ background: "#f8fdf6", borderRadius: "14px", padding: "1rem", border: "1px solid #e2f0da", marginBottom: "1.2rem" }}>
               {[
                 { label: "🏥 Pharmacie", valeur: pharmacie?.nom },
-                { label: "💊 Médicament", valeur: medicamentChoisi },
+                { label: "💊 Médicament", valeur: nomPropre(medicamentChoisi) },
                 { label: "📦 Quantité", valeur: quantite },
                 { label: "👤 Patient", valeur: utilisateur?.nom || "Patient" },
                 { label: "📞 Téléphone", valeur: utilisateur?.telephone || "Non renseigné" },
@@ -149,18 +174,23 @@ export default function Reservation({ pharmacie, utilisateur, onFermer }) {
               )}
             </div>
 
+            {erreur && (
+              <div style={{ background: "#fff0f0", color: "#c0392b", padding: "0.7rem", borderRadius: "10px", fontSize: "0.85rem", marginBottom: "1rem", textAlign: "center" }}>
+                ⚠️ {erreur}
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: "0.8rem" }}>
               <button
                 onClick={() => setEtape("choix")}
                 style={{ flex: 1, background: "#EAF3DE", color: "#3B6D11", border: "none", borderRadius: "12px", padding: "0.9rem", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}
-              >
-                ← Modifier
-              </button>
+              >← Modifier</button>
               <button
                 onClick={handleReserver}
-                style={{ flex: 1, background: "#639922", color: "white", border: "none", borderRadius: "12px", padding: "0.9rem", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer" }}
+                disabled={chargement}
+                style={{ flex: 1, background: chargement ? "#aaa" : "#639922", color: "white", border: "none", borderRadius: "12px", padding: "0.9rem", fontSize: "0.9rem", fontWeight: 700, cursor: chargement ? "not-allowed" : "pointer" }}
               >
-                ✅ Confirmer
+                {chargement ? "⏳ Envoi..." : "✅ Confirmer"}
               </button>
             </div>
           </div>
@@ -183,7 +213,7 @@ export default function Reservation({ pharmacie, utilisateur, onFermer }) {
               </div>
               {[
                 { label: "🏥 Pharmacie", valeur: confirmation.pharmacie },
-                { label: "💊 Médicament", valeur: confirmation.medicament },
+                { label: "💊 Médicament", valeur: nomPropre(confirmation.medicament) },
                 { label: "📦 Quantité", valeur: confirmation.quantite },
                 { label: "🕐 Heure", valeur: confirmation.heure },
                 { label: "📅 Date", valeur: confirmation.date },
